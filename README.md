@@ -157,3 +157,7 @@ Leave `mFilters` empty to receive every frame (the default).
 - Bit-timing math and hardware register ranges were derived from the ESP-IDF v5.5.5 sources (`hal/twai_ll.h`, `hal/twaifd_ll.h`, `soc/soc_caps.h`, `soc/twaifd_struct.h`) rather than from datasheet copy — double-check `actualArbitrationBitRate()` / `arbitrationSamplePointFromBitStart()` against a scope/analyzer on first bring-up of a new bit rate, as usual with any CAN bit-timing calculator.
 - This library has had **limited testing on real hardware** (basic tests with S3 and C5) — treat it more like bleeding edge rather than a drop-in production ready.
 - `SOC_TWAI_SUPPORT_FD` is resolved at **compile time** from the target chip, so a single sketch source can target either board, but `beginFD()` will only actually configure FD hardware when built for an FD-capable target (ESP32-C5 and other future FD-capable chips); on ESP32-S3 it returns `kControllerDoesNotSupportFD` without touching hardware.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The overall API design (a `Settings` object computing explicit bit-timing from a desired bit rate/sample point) is deliberately modeled after Pierre Molinaro's [`ACANFD_STM32`](https://github.com/pierremolinaro/acanfd-stm32) / [`ACAN2517FD`](https://github.com/pierremolinaro/acan2517FD), and `ACAN_ESP32FD_CANMessage.h` / `ACAN_ESP32FD_CANFDMessage.h` are reused verbatim from that same ACAN family (also MIT-licensed) — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
