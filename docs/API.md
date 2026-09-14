@@ -37,7 +37,7 @@ bool     isFDEnabled (void) const ;
 ```
 
 - `begin()` configures classic CAN only — works on every supported chip
-  (ESP32-S3 and ESP32-C5). `inSettings` may come from any of the four
+  (ESP32-S3, ESP32-C5, ESP32-S31). `inSettings` may come from any of the four
   `ACAN_ESP32FD_Settings` constructors; if it was built with a
   `DataBitRateFactor` other than `x1`, that data-phase timing is simply
   ignored by `begin()`.
@@ -294,9 +294,10 @@ twai_clock_source_t mClockSource = (twai_clock_source_t) 0 ; // 0 == TWAI_CLK_SR
 uint32_t mClockFrequency = 80'000'000 ; // Hz
 ```
 
-Both ESP32-S3 (APB clock) and ESP32-C5 (`PLL_F80M`, the default source) clock
-their TWAI peripheral at 80 MHz out of reset, hence the default. If you pick a
-non-default `mClockSource` (e.g. `TWAI_CLK_SRC_XTAL` on ESP32-C5), set
+ESP32-S3 (APB clock) and ESP32-C5/ESP32-S31 (`PLL_F80M`, the default source)
+all clock their TWAI peripheral at 80 MHz out of reset, hence the default
+(confirmed empirically on S31: default settings compute an exact 0 ppm-off
+bit rate). If you pick a non-default `mClockSource` (e.g. `TWAI_CLK_SRC_XTAL`), set
 `mClockFrequency` to match **before** relying on any of the computed fields
 below — easiest is to set both before constructing the `Settings` object, or
 to reconstruct it after changing them, since the bit-timing calculator runs

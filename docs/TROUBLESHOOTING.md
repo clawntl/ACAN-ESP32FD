@@ -139,6 +139,36 @@ controller protecting the bus from a persistently malfunctioning node.
    point mismatch between nodes is often intermittent and traffic-dependent;
    a bit rate mismatch is usually immediate and total.
 
+## CAN FD self-test/loopback (`LOOP_BACK_NO_ACK` + `beginFD()`) goes bus-off immediately
+
+**Symptom:** `beginFD()` returns success (`isFDEnabled()` is `true`, timing
+looks correct), the first `tryToSendFD()` reports `OK`, but `isBusOff()`
+immediately (and repeatedly) reports `true` afterward, and
+`recoverFromBusOff()` doesn't hold — you'll typically see a tight
+send/bus-off/recover cycle in the log, sometimes with an ESP-IDF-level
+`_node_recover(): node not in bus off` message mixed in (a symptom of the
+polling racing the driver's own internal recovery, not the root cause).
+
+**This is a known issue, confirmed on both ESP32-C5 and ESP32-S31.** The
+library's flag mapping for `LOOP_BACK_NO_ACK` (`flags.enable_loopback = 1`
++ `flags.enable_self_test = 1`) matches ESP-IDF's own documented meaning
+for those bits exactly, so this looks like a limitation/bug in the
+underlying `esp_driver_twai` `twai_node` driver's handling of FD framing
+(BRS in particular) under self-test, rather than something fixable from
+this wrapper. It does **not** affect:
+
+- Classic CAN self-test loopback (`LoopBackDemoClassic`) — works correctly.
+- Real-bus CAN FD communication in `NORMAL` mode with an actual transceiver
+  — confirmed working (including with a CAN bus analyzer) on ESP32-S31.
+
+**Workaround:** for FD bring-up/validation, prefer `NORMAL` mode on a real
+bus (even a simple two-wire bench setup with a transceiver and a CAN
+analyzer or a second node) over `LOOP_BACK_NO_ACK`. Use
+`LoopBackDemoClassic` if you just need a quick no-hardware sanity check of
+the driver/wiring/pins before moving to FD. If you find a fix or a missing
+config flag that resolves this, please open an issue/PR — this is being
+tracked as an open problem, not a documented permanent limitation.
+
 ## `beginFD()` "succeeds" but frames don't switch to the faster data rate
 
 Check `can0.isFDEnabled()` after `beginFD()` returns `kNoError` — it's
@@ -161,7 +191,7 @@ limitation, not a driver bug. `ACAN_ESP32FD::controllerSupportsFD()` returns
 `kControllerDoesNotSupportFD` immediately without touching hardware. Per the
 README, sending FD-format frames on an S3 causes bus errors — always call
 `begin()` (not `beginFD()`) on S3, and write portable code by branching on
-`controllerSupportsFD()` if the same sketch source targets both chips.
+`controllerSupportsFD()` if the same sketch source targets multiple chips.
 
 ## Build errors mentioning `esp_twai.h`, `twai_node_...`, or `SOC_TWAI_SUPPORT_FD`
 
@@ -171,19 +201,27 @@ online use. Confirm:
 
 - You're building with **arduino-esp32 core 3.3.9 or newer** (ESP-IDF
   5.5.4+) — earlier cores don't have `twai_node_...` at all.
-- For ESP32-C5 specifically, your arduino-esp32 core version actually
-  supports the C5 target (support landed around the same core versions as
-  the `twai_node` API).
+- For ESP32-C5/ESP32-S31 specifically, your arduino-esp32 core version
+  actually supports that target (support landed around the same core
+  versions as the `twai_node` API; ESP32-S31 currently needs an IDF 6.x-based
+  core such as pioarduino's `prep_IDF6` branch).
 - You haven't got another CAN library (e.g. one built on `driver/twai.h`)
   also included in the same sketch — the two APIs can coexist in ESP-IDF but
   mixing them for the *same* controller in one sketch is not something this
   library is designed to support.
+- If you're seeing `SOC_TWAI_SUPPORT_FD` reported as undefined/unrecognized
+  specifically on an IDF 6.x-based core, make sure you're on a version of
+  this library that includes the `SOC_TWAI_SUPPORT_FD` → `SOC_TWAI_FD_SUPPORTED`
+  compatibility bridge in `ACAN_ESP32FD_Settings.h` (added for ESP32-S31
+  support) — earlier versions only recognized the pre-IDF-6.x macro name and
+  would silently treat any IDF-6.x target as classic-only.
 
 ## This library has only had limited real-hardware testing — what does that mean for me?
 
 Per the README, the bit-timing math and register-range logic were derived
 from ESP-IDF v5.5.5 source, and the library has only had basic testing on
-real S3/C5 boards so far. Treat it more like bleeding edge than a drop-in
+real S3/C5 boards, plus ESP32-S31 (including real-bus CAN FD with a CAN
+analyzer) so far. Treat it more like bleeding edge than a drop-in
 production-ready driver:
 
 - Run the loopback examples (`LoopBackDemoClassic`, `LoopBackDemoFD`) first

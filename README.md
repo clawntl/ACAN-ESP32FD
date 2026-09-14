@@ -1,6 +1,6 @@
 # ACAN_ESP32FD
 
-An [ACAN-style](https://github.com/pierremolinaro) CAN / CAN-FD driver for **ESP32-S3** and **ESP32-C5**, built directly on top of the new ESP-IDF v5.5+ `esp_driver_twai` component (`esp_twai.h` / `esp_twai_onchip.h` — the "twai_node" API), rather than on the older, timing-inflexible `driver/twai.h` legacy API.
+An [ACAN-style](https://github.com/pierremolinaro) CAN / CAN-FD driver for **ESP32-S3**, **ESP32-C5**, and **ESP32-S31**, built directly on top of the new ESP-IDF v5.5+ `esp_driver_twai` component (`esp_twai.h` / `esp_twai_onchip.h` — the "twai_node" API), rather than on the older, timing-inflexible `driver/twai.h` legacy API.
 
 Like `ACANFD_STM32` / `ACAN2517FD`, you specify a **desired bit rate and a desired sample point** (not a fixed table of "standard" bit rates), and a bit-timing calculator computes an explicit `BRP / PROP_SEG / PHASE_SEG1 / PHASE_SEG2 / SJW` quintet for you — every one of those fields is public afterwards and can be hand-tuned if you want full manual control. `CANMessage` and `CANFDMessage` are the same generic classes used across the whole ACAN family, so code and message-handling logic ports over easily.
 
@@ -10,12 +10,15 @@ Like `ACANFD_STM32` / `ACAN2517FD`, you specify a **desired bit rate and a desir
 |-----------|:-----------:|:------------:|:------:|:-------------:|:-------------:|
 | ESP32-S3  | 1           | ✅           | ❌ (bus errors on FD frames) | 1 (splittable into 2×16-bit) | — |
 | ESP32-C5  | 2           | ✅           | ✅ (independent arbitration/data sample points) | 3 | 1 |
+| ESP32-S31 | 2           | ✅           | ✅ (independent arbitration/data sample points) | 3 | 1 |
 
-One `ACAN_ESP32FD` object drives one hardware controller. ESP32-C5 has two controllers, so instantiate two objects (with different pins) if you need both.
+ESP32-S31 uses the same TWAI-FD hardware IP block as the C5 (near-identical HAL/register layer), so it gets the same capabilities. Note ESP32-S31 support currently requires a beta/alpha ESP-IDF 6.x-based Arduino core (e.g. the [pioarduino](https://github.com/pioarduino) `prep_IDF6` platform branch) — treat it as bleeding edge even by this library's own standards.
 
-**Requires arduino-esp32 core 3.3.9 or newer** (ESP-IDF 5.5.4+) — the `twai_node` API this library wraps was only introduced in ESP-IDF 5.5. ESP32-C5 support in arduino-esp32 itself only became available around the same core versions.
+One `ACAN_ESP32FD` object drives one hardware controller. ESP32-C5/ESP32-S31 have two controllers each, so instantiate two objects (with different pins) if you need both.
 
-## Quick start — classic CAN (works on both S3 and C5)
+**Requires arduino-esp32 core 3.3.9 or newer** (ESP-IDF 5.5.4+) — the `twai_node` API this library wraps was only introduced in ESP-IDF 5.5. ESP32-C5 support in arduino-esp32 itself only became available around the same core versions. On IDF 6.x-based cores (e.g. current ESP32-S31 support), the underlying FD-capability macro was renamed from `SOC_TWAI_SUPPORT_FD` to `SOC_TWAI_FD_SUPPORTED`; this library bridges both names automatically, so FD detection stays correct either way.
+
+## Quick start — classic CAN (works on S3, C5, and S31)
 
 ```cpp
 #include <ACAN_ESP32FD.h>
@@ -55,7 +58,7 @@ void loop () {
 }
 ```
 
-## Quick start — CAN FD with an explicit sample point (ESP32-C5)
+## Quick start — CAN FD with an explicit sample point (ESP32-C5 / ESP32-S31)
 
 ```cpp
 #include <ACAN_ESP32FD.h>
@@ -141,8 +144,8 @@ Leave `mFilters` empty to receive every frame (the default).
 
 ## Examples
 
-- `LoopBackDemoClassic` — classic CAN, internal loopback, no transceiver/second board needed, works on S3 and C5
-- `LoopBackDemoFD` — CAN FD with independent arbitration/data sample points, internal loopback, ESP32-C5 only
+- `LoopBackDemoClassic` — classic CAN, internal loopback, no transceiver/second board needed, works on S3, C5, and S31
+- `LoopBackDemoFD` — CAN FD with independent arbitration/data sample points, internal loopback, ESP32-C5 / ESP32-S31 only. **Known issue:** `LOOP_BACK_NO_ACK` self-test mode combined with FD framing currently drives the controller into a repeated bus-off/recovery loop on both C5 and S31 (see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#can-fd-self-testloopback-loop_back_no_ack--beginfd-goes-bus-off-immediately)) — this looks like an upstream `esp_driver_twai` limitation with FD self-test, not a bug in this wrapper. Real-bus FD communication in `NORMAL` mode (verified on ESP32-S31 with a CAN analyzer) is unaffected.
 - `TwoBoards_Send` / `TwoBoards_Receive` — classic CAN across two real boards/transceivers
 
 ## Further documentation
@@ -155,8 +158,9 @@ Leave `mFilters` empty to receive every frame (the default).
 ## Notes / limitations
 
 - Bit-timing math and hardware register ranges were derived from the ESP-IDF v5.5.5 sources (`hal/twai_ll.h`, `hal/twaifd_ll.h`, `soc/soc_caps.h`, `soc/twaifd_struct.h`) rather than from datasheet copy — double-check `actualArbitrationBitRate()` / `arbitrationSamplePointFromBitStart()` against a scope/analyzer on first bring-up of a new bit rate, as usual with any CAN bit-timing calculator.
-- This library has had **limited testing on real hardware** (basic tests with S3 and C5) — treat it more like bleeding edge rather than a drop-in production ready.
-- `SOC_TWAI_SUPPORT_FD` is resolved at **compile time** from the target chip, so a single sketch source can target either board, but `beginFD()` will only actually configure FD hardware when built for an FD-capable target (ESP32-C5 and other future FD-capable chips); on ESP32-S3 it returns `kControllerDoesNotSupportFD` without touching hardware.
+- This library has had **limited testing on real hardware** (basic tests with S3 and C5, plus ESP32-S31 real-bus CAN FD confirmed working with a CAN analyzer) — treat it more like bleeding edge rather than a drop-in production ready.
+- `SOC_TWAI_SUPPORT_FD` is resolved at **compile time** from the target chip, so a single sketch source can target any supported board, but `beginFD()` will only actually configure FD hardware when built for an FD-capable target (ESP32-C5, ESP32-S31, and other future FD-capable chips); on ESP32-S3 it returns `kControllerDoesNotSupportFD` without touching hardware. On IDF 6.x-based cores this library transparently falls back to the renamed `SOC_TWAI_FD_SUPPORTED` macro (see above) so this detection stays correct without any user-visible change.
+- **CAN FD internal self-test loopback (`LOOP_BACK_NO_ACK` + `beginFD()`) currently goes bus-off** on both ESP32-C5 and ESP32-S31 — see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#can-fd-self-testloopback-loop_back_no_ack--beginfd-goes-bus-off-immediately). Classic self-test loopback and real-bus FD communication both work correctly; only the FD+self-test combination is affected.
 
 ## License
 

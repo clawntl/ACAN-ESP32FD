@@ -12,13 +12,14 @@ see [API.md](API.md#acan_esp32fd_filters).
 |---|:---:|:---:|---|
 | ESP32-S3 | 1 | — | The single mask filter can be split into two independent 16-bit "dual" filters via `addDualMaskFilter` |
 | ESP32-C5 | 3 | 1 | Each of the 3 mask filters can independently be split into a dual filter too |
+| ESP32-S31 | 3 | 1 | Same TWAI-FD IP block as C5 — identical filter budget |
 
 This budget is fixed by the SoC (`SOC_TWAI_MASK_FILTER_NUM` in
 `soc_caps.h`) — `ACAN_ESP32FD_Filters` reads it at compile time, so
 `addMaskFilter`/`addDualMaskFilter` simply return `false` once it's
 exhausted, and `addRangeFilter` returns `false` on ESP32-S3 (no range filter
-hardware at all) or if one has already been configured on ESP32-C5 (only
-one).
+hardware at all) or if one has already been configured on ESP32-C5/ESP32-S31
+(only one).
 
 **Leave `mFilters` empty to receive every frame** — this is the default and
 requires no filter hardware at all.
@@ -60,7 +61,7 @@ settings.mFilters.addMaskFilter (0x1ABCDEF0, 0x1FFFFFFF, true) ;
 An all-`1`s mask (matching the full ID width for the chosen `inExtended`)
 means "exact match only."
 
-`inNoClassic` / `inNoFD` (ESP32-C5 only; ignored elsewhere) let you further
+`inNoClassic` / `inNoFD` (ESP32-C5/ESP32-S31 only; ignored elsewhere) let you further
 restrict a filter to reject classic-format or FD-format frames respectively,
 independent of the ID match — e.g. `addMaskFilter (0x100, 0x700, false,
 false, true)` accepts IDs `0x100-0x1FF` but only in classic framing, never
@@ -95,7 +96,7 @@ are always "don't care" in dual mode. If you need a precise match on a full
 29-bit ID, use a plain (non-dual) `addMaskFilter` instead, which uses the
 full ID width.
 
-## Range filter (ESP32-C5 only)
+## Range filter (ESP32-C5 / ESP32-S31 only)
 
 ```cpp
 bool addRangeFilter (uint32_t inRangeLow, uint32_t inRangeHigh, bool inExtended,
@@ -132,7 +133,7 @@ ACAN_ESP32FD_Settings settings (500UL * 1000UL) ;
 settings.mTxPin = GPIO_NUM_4 ;
 settings.mRxPin = GPIO_NUM_5 ;
 
-// ESP32-C5: use all three mask-filter slots plus the range filter.
+// ESP32-C5 / ESP32-S31: use all three mask-filter slots plus the range filter.
 settings.mFilters.addMaskFilter     (0x100, 0x700, false) ;         // 0x100-0x1FF
 settings.mFilters.addDualMaskFilter (0x10, 0x7F0, 0x20, 0x7F0, false) ; // 0x10-0x1F and 0x20-0x2F
 settings.mFilters.addRangeFilter    (0x300, 0x3FF, false) ;         // 0x300-0x3FF
