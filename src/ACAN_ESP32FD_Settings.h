@@ -31,6 +31,18 @@
 #include <ACAN_ESP32FD_Filters.h>
 
 //------------------------------------------------------------------------------
+// Some newer IDF releases (v5.5+ on some targets, and all IDF 6.x branches
+// seen so far, e.g. ESP32-S31) renamed the FD capability macro from
+// SOC_TWAI_SUPPORT_FD to SOC_TWAI_FD_SUPPORTED. Bridge the old name to the
+// new one when only the new one is present, so this library keeps detecting
+// FD-capable controllers regardless of which IDF version defines it.
+//------------------------------------------------------------------------------
+
+#if !defined(SOC_TWAI_SUPPORT_FD) && defined(SOC_TWAI_FD_SUPPORTED)
+  #define SOC_TWAI_SUPPORT_FD SOC_TWAI_FD_SUPPORTED
+#endif
+
+//------------------------------------------------------------------------------
 // SOC_TWAI_SUPPORT_FD is not defined at all on classic-only targets, so make
 // it safe to test with #if everywhere in this library.
 //------------------------------------------------------------------------------
