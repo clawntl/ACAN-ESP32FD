@@ -26,7 +26,7 @@ slices called **time quanta (Tq)**, allocated across four segments:
 - **PROP_SEG** — compensates for physical propagation delay (transceiver +
   wire round-trip). On this library's non-FD-capable path it's fixed at 0
   (folded into PHASE_SEG1 by the hardware); on FD-capable controllers
-  (ESP32-C5) it's a separate, explicit field.
+  (ESP32-C5, ESP32-S31) it's a separate, explicit field.
 - **PHASE_SEG1** / **PHASE_SEG2** — surround the sample point and absorb
   clock drift between nodes. Every re-sync can shrink/stretch these by up to
   **SJW** quanta to pull the local bit boundary back in line with the bus.
@@ -153,7 +153,7 @@ phase.
 
 The exact maximum values for `BRP`/`PROP_SEG`/`PHASE_SEG1`/`PHASE_SEG2`/`SJW`
 differ between the classic-only register layout (ESP32-S3,
-`hal/twai_ll.h`) and the FD-capable register layout (ESP32-C5,
+`hal/twai_ll.h`) and the FD-capable register layout (ESP32-C5/ESP32-S31,
 `hal/twaifd_ll.h`, `soc/twaifd_struct.h`) — notably, `PROP_SEG` is folded
 into `PHASE_SEG1` on the classic path (always reported as 0) but is a
 distinct field on the FD path. `computeSegments()` already knows which limits
